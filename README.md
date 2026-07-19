@@ -1,6 +1,6 @@
 # AI LINE News
 
-GoogleニュースのRSSからAIニュースを5件集め、LINEのFlex Messageとして毎朝7時（日本時間）にブロードキャスト配信するプロジェクトです。
+GoogleニュースのRSSからAIニュースを5件集め、うち最大2件はAI動画生成関連を優先して、LINEのFlex Messageとして毎朝7時（日本時間）にブロードキャスト配信するプロジェクトです。
 
 ## 構成
 

@@ -14,12 +14,8 @@ from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 
-RSS_URL = (
-    "https://news.google.com/rss/search?"
-    + urllib.parse.urlencode(
-        {"q": "AI", "hl": "ja", "gl": "JP", "ceid": "JP:ja"}
-    )
-)
+RSS_BASE_URL = "https://news.google.com/rss/search?"
+RSS_QUERIES = ("AI 動画生成", "AI")
 LINE_BROADCAST_URL = "https://api.line.me/v2/bot/message/broadcast"
 MAX_ARTICLES = 5
 
@@ -50,9 +46,15 @@ def load_local_env() -> None:
         )
 
 
-def fetch_articles() -> list[dict[str, str]]:
+def make_rss_url(query: str) -> str:
+    return RSS_BASE_URL + urllib.parse.urlencode(
+        {"q": query, "hl": "ja", "gl": "JP", "ceid": "JP:ja"}
+    )
+
+
+def fetch_rss_articles(query: str) -> list[dict[str, str]]:
     request = urllib.request.Request(
-        RSS_URL,
+        make_rss_url(query),
         headers={"User-Agent": "ai-line-news/1.0"},
     )
     with urllib.request.urlopen(request, timeout=20) as response:
@@ -60,7 +62,7 @@ def fetch_articles() -> list[dict[str, str]]:
 
     root = ET.fromstring(xml_data)
     articles: list[dict[str, str]] = []
-    for item in root.findall("./channel/item")[:MAX_ARTICLES]:
+    for item in root.findall("./channel/item"):
         source = (item.findtext("source") or "Googleニュース").strip()
         title = (item.findtext("title") or "無題").strip()
         suffix = f" - {source}"
@@ -77,6 +79,23 @@ def fetch_articles() -> list[dict[str, str]]:
                 "url": (item.findtext("link") or "").strip(),
             }
         )
+
+    return articles
+
+
+def fetch_articles() -> list[dict[str, str]]:
+    """AI動画生成を最大2件優先し、AI一般ニュースで5件にする。"""
+    video_articles = fetch_rss_articles(RSS_QUERIES[0])[:2]
+    general_articles = fetch_rss_articles(RSS_QUERIES[1])
+    articles = video_articles.copy()
+    seen_urls = {article["url"] for article in articles}
+
+    for article in general_articles:
+        if article["url"] not in seen_urls:
+            articles.append(article)
+            seen_urls.add(article["url"])
+        if len(articles) == MAX_ARTICLES:
+            break
 
     if len(articles) < MAX_ARTICLES:
         raise RuntimeError(f"RSSから取得できた記事が{len(articles)}件です（5件必要）。")
